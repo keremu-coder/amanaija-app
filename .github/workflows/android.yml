@@ -1,0 +1,74 @@
+name: Build Android app (Play Store file)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Version number. Must be higher than the last upload (1, 2, 3...)"
+        default: "1"
+      version_name:
+        description: "Version shown to users"
+        default: "1.0.0"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # The GitHub runner already has the Android SDK; we only add the platform we need.
+      - name: Install Android platform
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      # First run: no key exists yet, so we make one. Keep the artifact "upload-key" safe (private repo).
+      # Next runs: paste its values into GitHub Secrets (see docs/store/README.md) so every build is signed by the same key.
+      - name: Prepare signing key
+        id: key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/keys/upload.jks"
+            PASS="$KS_PASS"
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+          else
+            PASS="$(openssl rand -hex 16)"
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/keys/upload.jks" -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$PASS" -keypass "$PASS" -dname "CN=AmaNaija, O=AmaNaija, C=NG"
+            base64 -w0 "$RUNNER_TEMP/keys/upload.jks" > "$RUNNER_TEMP/keys/ANDROID_KEYSTORE_B64.txt"
+            echo "$PASS" > "$RUNNER_TEMP/keys/ANDROID_KEYSTORE_PASSWORD.txt"
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/keys/upload.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=upload" >> "$GITHUB_ENV"
+
+      - name: Build release bundle
+        run: gradle -p mobile/android bundleRelease -PVERSION_CODE=${{ inputs.version_code }} -PVERSION_NAME=${{ inputs.version_name }}
+
+      - name: Show signing fingerprints (needed for assetlinks)
+        run: keytool -list -v -keystore "$KEYSTORE_PATH" -alias upload -storepass "$KEYSTORE_PASSWORD" | grep -E "SHA1|SHA256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: amanaija-play-bundle
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+
+      - uses: actions/upload-artifact@v4
+        if: steps.key.outputs.generated == 'true'
+        with:
+          name: upload-key
+          path: ${{ runner.temp }}/keys/

@@ -1,0 +1,26 @@
+name: iOS build check (no Apple account needed)
+
+# Proves the iPhone wrapper builds on a cloud Mac. It does NOT submit anything.
+# Signing and App Store upload are added after the $99 Apple Developer account exists (see docs/store/README.md).
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install and create the iOS project
+        working-directory: mobile/ios
+        run: |
+          npm install
+          npx cap add ios
+          npx cap sync ios
+      - name: Build for simulator (unsigned)
+        working-directory: mobile/ios
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -configuration Release \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build

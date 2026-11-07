@@ -1,0 +1,7 @@
+{
+  "appId": "com.amanaija.app",
+  "appName": "AmaNaija",
+  "webDir": "www",
+  "server": { "url": "https://amanaija.vercel.app", "cleartext": false },
+  "ios": { "contentInset": "always" }
+}

@@ -1,0 +1,53 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Change these only when you move to your own domain (see docs/store/README.md).
+def vCode = Integer.parseInt(((project.findProperty('VERSION_CODE') ?: '1') as String).trim() ?: '1')
+def vName = ((project.findProperty('VERSION_NAME') ?: '1.0.0') as String).trim() ?: '1.0.0'
+def twaHost = (project.findProperty('TWA_HOST') ?: 'amanaija.vercel.app') as String
+
+android {
+    namespace 'com.amanaija.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.amanaija.app'
+        minSdk 23
+        targetSdk 36
+        versionCode = vCode
+        versionName = vName
+        manifestPlaceholders = [hostName: twaHost]
+        resValue 'string', 'asset_statements',
+            "[{\\\"relation\\\": [\\\"delegate_permission/common.handle_all_urls\\\"], \\\"target\\\": {\\\"namespace\\\": \\\"web\\\", \\\"site\\\": \\\"https://${twaHost}\\\"}}]"
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('KEYSTORE_PATH')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (System.getenv('KEYSTORE_PATH')) { signingConfig signingConfigs.release }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+    implementation 'com.google.androidbrowserhelper:locationdelegation:1.1.1'
+}

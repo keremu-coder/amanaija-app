@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+:root {
+  --day-1: #F4B467;
+  --day-2: #FBD9A4;
+  --day-3: #FDEBCB;
+  --ground-day: #B97A4C;
+  --ground-night: #160D20;
+}
+
+@theme {
+  --color-day-1: var(--day-1);
+  --color-day-2: var(--day-2);
+  --color-day-3: var(--day-3);
+  --radius-sheet: 32px;
+  --radius-card: 28px;
+  --radius-btn: 16px;
+  --radius-pill: 14px;
+}
+
+@layer base {
+  :focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* ---- AmaNaija design tokens ---- */
+:root {
+  --ink: #17131F; --text-2: #4B4457; --text-3: #6A6275;
+  --cream: #FFFBF5; --cream-2: #F1EADF; --border: #EADFCF;
+  --green: #1F7A4D; --green-deep: #165C3A; --green-tint: #DDF1E4;
+  --ochre: #F4B73F; --ochre-tint: #FCEBC8; --ochre-text: #6B4000;
+  --terracotta: #C8506B; --danger: #B3261E;
+  --night-1: #1B1340; --night-2: #5A2A6C; --night-3: #C8506B; --night-4: #F4A85E;
+  --day-1: #F4B467; --day-2: #FBD9A4; --day-3: #FDEBCB;
+  --ground-day: #B97A4C; --ground-night: #160D20;
+  --background: #FFFBF5; --foreground: #17131F;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --background: #FFFBF5; --foreground: #17131F; }
+}
+@theme inline {
+  --color-ink: var(--ink); --color-text-2: var(--text-2); --color-text-3: var(--text-3);
+  --color-cream: var(--cream); --color-cream-2: var(--cream-2); --color-border: var(--border);
+  --color-green: var(--green); --color-green-deep: var(--green-deep); --color-green-tint: var(--green-tint);
+  --color-ochre: var(--ochre); --color-ochre-tint: var(--ochre-tint); --color-ochre-text: var(--ochre-text);
+  --color-terracotta: var(--terracotta); --color-danger: var(--danger);
+  --color-day-1: var(--day-1); --color-day-2: var(--day-2); --color-day-3: var(--day-3);
+  --font-heading: var(--font-bricolage); --font-body: var(--font-nunito);
+}
+@theme {
+  --radius-sheet: 32px; --radius-card: 28px; --radius-btn: 16px; --radius-pill: 14px;
+}
+body { font-family: var(--font-nunito), system-ui, sans-serif; }
+@layer base {
+  :focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+/* ---- iPhone fit and smoothness ---- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; height: 100%; background: #FFFBF5; }
+body {
+  min-height: 100dvh; margin: 0; overflow-x: hidden;
+  overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
+}
+/* No double-tap zoom, no 300ms tap delay */
+a, button, input, select, textarea, label, [role="button"] { touch-action: manipulation; }
+button, a { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+/* iPhone zooms the page when a field is under 16px. Keep fields at 16px so it never zooms. */
+input:not([type="checkbox"]):not([type="radio"]):not(.text-3xl):not(.text-2xl), textarea, select { font-size: max(16px, 1em) !important; max-width: 100%; }
+img, video { max-width: 100%; }
+/* Full screen follows the visible area, so the keyboard never hides what you type */
+main.h-dvh { height: var(--vvh, 100dvh); }
+@supports selector(:has(*)) { html[data-kb="1"] body:has(main.h-dvh) { overflow: hidden; } }
+
+/* Smooth scrolling lists */
+.overflow-y-auto, .overflow-auto { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+/* Gentle press feedback everywhere */
+button:active, a:active { transition: transform .08s ease; }
+
+/* ---- Calm, slim, premium look: warm paper, hairlines, light weights ---- */
+:root { --paper: #FAF9F5; --hair: #E8E6DC; --ink-2: #6B6A68; }
+html, body { background: var(--paper); }
+body { color: #1F1E1D; }
+.ama-chip, .ama-primary, .ama-accent { border-radius: 12px; font-weight: 600; letter-spacing: 0; transition: transform .12s ease, background-color .15s ease; }
+.ama-primary { color: #fff; background: #1F7A4D; box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.ama-accent { color: #5B3A00; background: #FFF4D9; box-shadow: inset 0 0 0 1px #F0D9A0; }
+.ama-chip { color: #1F1E1D; background: #fff; box-shadow: inset 0 0 0 1px var(--hair), 0 1px 2px rgba(0,0,0,.04); }
+.ama-primary:active, .ama-accent:active, .ama-chip:active { transform: scale(.97); }
+.ama-card { background: #fff; border-radius: 16px; box-shadow: inset 0 0 0 1px var(--hair); }
+.ama-dock { background: #fff; border-radius: 22px; box-shadow: inset 0 0 0 1px var(--hair), 0 14px 34px -18px rgba(31,30,29,.35); }
+.ama-sheet { background: var(--paper); border-radius: 22px 22px 0 0; box-shadow: 0 -1px 0 var(--hair), 0 -16px 40px -22px rgba(31,30,29,.35); transition: height .28s cubic-bezier(.2,.8,.2,1); }
+.ama-grab { touch-action: none; display: flex; justify-content: center; padding: 10px 0 6px; }
+.ama-grab span { width: 36px; height: 4px; border-radius: 2px; background: #D6D3C8; }
+.ama-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: #EFEDE4; }
+.ama-seg button { height: 30px; min-width: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
+.ama-seg button.on { background: #fff; color: #1F1E1D; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.ama-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; padding: 6px 2px 4px; border: 0; background: none; color: var(--ink-2); font-size: 11px; font-weight: 600; text-decoration: none; }
+.ama-tab .ic { display: flex; align-items: center; justify-content: center; width: 44px; height: 28px; color: inherit; transition: transform .12s ease; }
+.ama-tab.hot { color: #1F7A4D; }
+.ama-tab:active .ic { transform: scale(.9); }
+.ama-pill { height: 34px; padding: 0 14px; border-radius: 10px; border: 0; font-size: 13px; font-weight: 600; background: #EFEDE4; color: #4A4943; }
+.ama-pill.on { background: #1F1E1D; color: #fff; }
+h1, h2 { font-family: var(--font-serif), Georgia, serif; font-weight: 600; letter-spacing: -.01em; }
+.ama-row { display: flex; width: 100%; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 16px; background: #fff; border: 0; color: #1F1E1D; font-size: 15px; font-weight: 600; text-align: left; text-decoration: none; }
+.ama-row i { font-style: normal; font-size: 22px; color: #A9A69B; font-weight: 400; }
+.ama-row:active { background: #F5F3EC; }
+.ama-skel { background: linear-gradient(90deg, #EFEDE4 25%, #F7F5EE 50%, #EFEDE4 75%); background-size: 200% 100%; animation: ama-shimmer 1.2s ease-in-out infinite; border-radius: 10px; }
+@keyframes ama-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .ama-skel { animation: none; } }

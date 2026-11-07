@@ -1,0 +1,28 @@
+:root {
+  --ink: #17131F; --text-2: #4B4457; --text-3: #6A6275;
+  --cream: #FFFBF5; --cream-2: #F1EADF; --border: #EADFCF;
+  --green: #1F7A4D; --green-deep: #165C3A; --green-tint: #DDF1E4;
+  --ochre: #F4B73F; --ochre-tint: #FCEBC8; --ochre-text: #6B4000;
+  --terracotta: #C8506B; --danger: #B3261E;
+  --night-1: #1B1340; --night-2: #5A2A6C; --night-3: #C8506B; --night-4: #F4A85E;
+  --day-1: #F4B467; --day-2: #FBD9A4; --day-3: #FDEBCB;
+  --ground-day: #B97A4C; --ground-night: #160D20;
+}
+@theme inline {
+  --color-ink: var(--ink); --color-text-2: var(--text-2); --color-text-3: var(--text-3);
+  --color-cream: var(--cream); --color-cream-2: var(--cream-2); --color-border: var(--border);
+  --color-green: var(--green); --color-green-deep: var(--green-deep); --color-green-tint: var(--green-tint);
+  --color-ochre: var(--ochre); --color-ochre-tint: var(--ochre-tint); --color-ochre-text: var(--ochre-text);
+  --color-terracotta: var(--terracotta); --color-danger: var(--danger);
+  --color-day-1: var(--day-1); --color-day-2: var(--day-2); --color-day-3: var(--day-3);
+  --font-heading: var(--font-bricolage); --font-body: var(--font-nunito);
+}
+@theme {
+  --radius-sheet: 32px; --radius-card: 28px; --radius-btn: 16px; --radius-pill: 14px;
+}
+@layer base {
+  :focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+}
