@@ -25,7 +25,12 @@ export async function POST(req: Request) {
 
     // 2. Handle Successful Charge
     if (event.event === 'charge.success') {
-      const { reference, amount, status } = event.data;
+      const { reference: rawRef, amount, status } = event.data;
+      // Reference is `<order uuid>.<attempt>`; older payments used the bare uuid.
+      const reference = String(rawRef || '').slice(0, 36);
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(reference)) {
+        return NextResponse.json({ message: 'Unknown reference' });
+      }
 
       if (status !== 'success') {
         return NextResponse.json({ message: 'Payment not successful' });
@@ -49,7 +54,7 @@ export async function POST(req: Request) {
       }
 
       // 5. Idempotency: Check if already verified
-      if (order.status === 'Processing' || order.status === 'Payment Verified') {
+      if (order.status === 'Processing' || order.status === 'Payment Verified' || order.status === 'Completed') {
         return NextResponse.json({ message: 'Already processed' });
       }
 

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { tooMany } from "@/lib/ratelimit";
 import crypto from "crypto";
 import sharp from "sharp";
+import { stripVideoMeta } from "@/lib/stripVideoMeta";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -104,8 +105,8 @@ export async function POST(req: Request) {
         return Response.json({ error: "Failed to process image: " + e.message }, { status: 400 });
       }
     } else {
-      // Video: accept as-is. Metadata (GPS in some containers) not stripped in v1.
-      // Known gap. Phase 2 will add ffmpeg-static.
+      // Video: blank out location/device tags (udta, meta) in place, no re-encode.
+      finalBuffer = stripVideoMeta(finalBuffer, file.type);
       ext = file.type === "video/quicktime" ? "mov" : file.type === "video/webm" ? "webm" : "mp4";
     }
 

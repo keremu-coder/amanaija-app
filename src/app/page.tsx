@@ -578,8 +578,11 @@ export default function Home() {
       try {
         const ipRes = await fetch('/api/auth/track-ip', { 
           method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ email }) 
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + ((await supabase.auth.getSession()).data.session?.access_token || '')
+          },
+          body: JSON.stringify({})
         });
         if (!ipRes.ok) {
           const ipData = await ipRes.json();

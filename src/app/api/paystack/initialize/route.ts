@@ -42,8 +42,9 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         email,
         amount,
-        reference: String(order.id),
-        callback_url: `https://amanaija.vercel.app/`,
+        // Unique per attempt so a failed card can always be retried (Paystack rejects reused references).
+        reference: `${order.id}.${Date.now().toString(36)}`,
+        callback_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://amanaija.vercel.app'}/`,
       }),
     });
 
