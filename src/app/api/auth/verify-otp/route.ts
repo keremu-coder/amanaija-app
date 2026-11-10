@@ -53,12 +53,18 @@ export async function POST(req: Request) {
 
     await supabaseAdmin.from("otp_codes").delete().eq("id", data.id);
 
-    // Remember, on the server, that this phone passed the check (used by create_order)
-    await supabaseAdmin
+    // Only the person who received this code gets the proof. create_order checks it.
+    const proof = crypto.randomBytes(32).toString("base64url");
+    const proofHash = crypto.createHash("sha256").update(proof).digest("hex");
+    const { error: saveErr } = await supabaseAdmin
       .from("verified_phones")
-      .upsert({ phone: cleanPhone, verified_at: new Date().toISOString() });
+      .upsert({ phone: cleanPhone, verified_at: new Date().toISOString(), proof_hash: proofHash });
+    if (saveErr) {
+      console.error("verify-otp save error:", saveErr.message);
+      return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });
+    }
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, phone_proof: proof });
   } catch (err: any) {
     console.error("verify-otp error:", err?.message);
     return Response.json({ error: "Something went wrong. Please try again." }, { status: 500 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { shareOrWhatsApp } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 
 const RESERVED = ["admin", "api", "s", "www", "amanaija", "support", "help", "login", "app", "shop", "shops", "terms", "privacy"];
@@ -109,7 +110,7 @@ export default function ShopLinkBox({ place }: { place: any }) {
       {saved && (
         <div className="mt-2 flex gap-2">
           <a href={`/s/${saved}/card`} target="_blank" rel="noopener noreferrer" className="flex h-11 flex-1 items-center justify-center rounded-lg bg-[#17131F] text-sm font-bold text-white active:scale-95">Poster with QR</a>
-          <a href={`https://wa.me/?text=${encodeURIComponent(`Find ${place?.name || "our shop"} on AmaNaija: ${link}`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 flex-1 items-center justify-center rounded-lg bg-[#1F7A4D] text-sm font-bold text-white active:scale-95">Share on WhatsApp</a>
+          <button type="button" onClick={() => shareOrWhatsApp({ title: place?.name || "AmaNaija", text: `Find ${place?.name || "our shop"} on AmaNaija`, url: link })} className="flex h-11 flex-1 items-center justify-center rounded-lg bg-[#1F7A4D] text-sm font-bold text-white active:scale-95">Share on WhatsApp</button>
         </div>
       )}
     </div>

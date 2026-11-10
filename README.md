@@ -1,29 +1,36 @@
-# AmaNaija
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-A live, map-based community and marketplace for Nigerian streets. People find nearby shops, services and homes on a real map, ask the street for something they need, message sellers with consent, and list items for sale under an anonymous nickname.
+## Getting Started
 
-Live: https://amanaija.vercel.app
+First, run the development server:
 
-## What it does
-- **Live map** of shops, services and homes, with privacy-first presence (area-level only, ghost mode, opt-in "open to hello").
-- **Ask the street:** "I need X" reaches nearby shops, who reply that they have it.
-- **Shop pages** with a permanent link, orders, bookings and a seller poster with QR.
-- **Market:** anonymous sellers, shareable listing links with rich previews, live-camera photos with a proof code, duplicate-photo detection, and report-based takedowns.
-- **Hawkers:** people who sell on foot can opt in to be found nearby for a few hours, at a rounded location only, and be called over.
-- **Consent-based messaging** with block and report, plus push alerts.
-- **Installable PWA**, with an Android wrapper and an iOS shell in `mobile/`.
-
-## Stack
-Next.js 16 (App Router, cache components), React 19, Tailwind CSS 4, Supabase (Postgres, Row Level Security, Realtime, Storage), MapLibre GL, Paystack, Termii, deployed on Vercel.
-
-## Run it
 ```bash
-npm install
-cp .env.example .env.local   # add your Supabase and service keys
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
-Database setup lives in `supabase/`: run the SQL files in the Supabase SQL editor (the files are safe to run more than once).
 
-## Notes
-- All privacy rules are enforced in the database with Row Level Security, not only in the UI.
-- Photos are re-encoded server-side, which removes location data from the files.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

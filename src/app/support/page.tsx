@@ -17,7 +17,7 @@ export default function Support() {
         <h2 className="text-lg font-extrabold">Common help</h2>
         <p><strong>Track an order:</strong> Open the app, tap Track and enter your 4-digit code.</p>
         <p><strong>Report or block someone:</strong> Tap their avatar on the map, then choose Report or Block.</p>
-        <p><strong>Hide from others:</strong> Use the ghost icon on the map. Turn off &quot;open to hello&quot; to stop message requests.</p>
+        <p><strong>Hide from others:</strong> Ghost mode hides you and a home you saved. Open to hello lets a neighbour message you only while you are still outside.</p>
         <p><strong>Delete your account:</strong> <Link href="/delete-account" className="font-bold text-[#165C3A] underline">Delete account</Link>.</p>
         <p><strong>Policies:</strong> <Link href="/privacy" className="font-bold text-[#165C3A] underline">Privacy</Link> and <Link href="/terms" className="font-bold text-[#165C3A] underline">Terms</Link>.</p>
       </section>

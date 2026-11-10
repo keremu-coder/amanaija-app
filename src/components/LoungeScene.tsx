@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import LiveHere from "@/components/LiveHere";
+import type { Life } from "@/lib/life";
+import { readPosition } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 
 type Place = { id: string; name: string; type: string; state: string; lat: number; lng: number };
@@ -89,7 +92,7 @@ function PlaceRow({ name, sub, live, onClick }: { name: string; sub: string; liv
 }
 
 export default function LoungeScene({
-  onEnterRoom, onOpenMap, onOpenShopOwner, onSelectLocation, userName, placeCount
+  onEnterRoom, onOpenMap, onOpenShopOwner, onSelectLocation, userName, placeCount, userId, onLife, onEnterLife, life, onShowStreet,
 }: {
   onEnterRoom: () => void;
   onOpenMap: () => void;
@@ -97,6 +100,11 @@ export default function LoungeScene({
   onSelectLocation: (lat: number, lng: number) => void;
   userName: string;
   placeCount: number;
+  userId: string | null;
+  onLife: (life: Life | null) => void;
+  onEnterLife: (life: Life) => void;
+  life?: Life | null;
+  onShowStreet?: () => void;
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -105,6 +113,7 @@ export default function LoungeScene({
   const [allPlaces, setAllPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
   const [gpsMsg, setGpsMsg] = useState("");
+  const [finding, setFinding] = useState(false);
 
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaState, setNewAreaState] = useState("");
@@ -139,21 +148,23 @@ export default function LoungeScene({
     .filter(p => fuzzyMatch(query, p.name) || fuzzyMatch(query, p.state))
     .sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 
-  const handleNearest = () => {
+  const findMe = () => {
     setGpsMsg("");
-    if (!navigator.geolocation) {
-      setGpsMsg("Your phone cannot share its location here.");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
+    setFinding(true);
+    readPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }).then(
       (pos) => {
+        setFinding(false);
         onSelectLocation(pos.coords.latitude, pos.coords.longitude);
         setShowPicker(false);
       },
-      () => setGpsMsg("We could not get your location. Search for your area instead."),
-      { enableHighAccuracy: true, timeout: 15000 }
+      () => {
+        setFinding(false);
+        setGpsMsg("I could not find you. Step outside, or type your area.");
+      }
     );
   };
+
+  const handleNearest = () => findMe();
 
   const handleAddArea = async () => {
     if (!newAreaName || !newAreaState) return;
@@ -339,9 +350,11 @@ export default function LoungeScene({
 
       <div className="absolute bottom-0 left-0 right-0 z-20" style={{ padding: "16px", paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
         <div className="bg-white/95 backdrop-blur-md rounded-3xl p-4 shadow-2xl border border-white/50">
-          <h1 className="text-xl font-bold text-[#2E4A36] tracking-tight">Welcome to AmaNaija</h1>
-          <p className="text-xs text-gray-600 mt-1 mb-3 leading-snug">Your street. Your people. Anywhere in the world.</p>
-          <button onClick={() => setShowPicker(true)} className="w-full bg-[#2E4A36] text-white font-bold py-3.5 rounded-2xl shadow-lg hover:bg-[#203527] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-base">
+          <h1 className="text-[28px] font-bold leading-tight text-[#17131F] tracking-tight">Your street. Your people.</h1>
+          <p className="text-[15px] text-[#4A4943] mt-1 mb-3 leading-snug">Anywhere in the world.</p>
+          <LiveHere userId={userId} onLife={onLife} onShowOnMap={onSelectLocation} onShowStreet={onShowStreet} onEnter={onEnterLife} known={life} />
+          {gpsMsg && <p className="mb-2 text-[14px] font-semibold leading-snug text-[#17131F]">{gpsMsg}</p>}
+          <button type="button" data-guide="street" onClick={() => setShowPicker(true)} className="w-full bg-[#2E4A36] text-white font-bold py-3.5 rounded-2xl shadow-lg hover:bg-[#203527] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-base">
             <PinIcon size={20} /> Find your street
           </button>
           <button onClick={onEnterRoom} className="w-full mt-2 bg-[#E8EFEA] border-2 border-[#DCE5DE] text-[#2E4A36] font-semibold py-3 rounded-2xl hover:bg-[#DCE5DE] active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm">

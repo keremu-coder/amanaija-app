@@ -125,10 +125,27 @@ body { color: #1F1E1D; }
 .ama-seg { display: inline-flex; padding: 2px; border-radius: 10px; background: #EFEDE4; }
 .ama-seg button { height: 30px; min-width: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; }
 .ama-seg button.on { background: #fff; color: #1F1E1D; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
-.ama-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: 1; padding: 6px 2px 4px; border: 0; background: none; color: var(--ink-2); font-size: 11px; font-weight: 600; text-decoration: none; }
-.ama-tab .ic { display: flex; align-items: center; justify-content: center; width: 44px; height: 28px; color: inherit; transition: transform .12s ease; }
+.ama-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1 1 0; min-width: 0; min-height: 52px; padding: 4px 0 2px; border: 0; background: none; color: #1F1E1D; font-size: 11px; font-weight: 700; line-height: 1.1; letter-spacing: -0.01em; text-decoration: none; }
+.ama-tab .ic { display: flex; align-items: center; justify-content: center; width: 100%; height: 28px; color: #1F1E1D; }
 .ama-tab.hot { color: #1F7A4D; }
-.ama-tab:active .ic { transform: scale(.9); }
+.ama-tab.hot .ic { color: #1F7A4D; }
+.ama-tab:active .ic { transform: scale(.92); }
+.guide-walker { position: fixed; z-index: 30; width: 44px; pointer-events: none; }
+.guide-walker button, .guide-walker .guide-brain { pointer-events: auto; }
+.guide-walker.walk, .guide-walker.dance { z-index: 90; }
+.guide-walker.walk { transition: left .95s linear, top .95s linear; }
+.guide-bob { transform-origin: 50% 100%; }
+.guide-walker.walk .guide-bob { animation: guide-bob .32s ease-in-out infinite; }
+.guide-walker.walk .guide-leg.left { animation: guide-step .32s linear infinite; }
+.guide-walker.walk .guide-leg.right { animation: guide-step .32s linear infinite reverse; }
+.guide-walker.dance .guide-bob { animation: guide-dance .45s ease-in-out infinite; }
+.guide-walker.dance .guide-leg.left { animation: guide-step .22s linear infinite; }
+.guide-walker.dance .guide-leg.right { animation: guide-step .22s linear infinite reverse; }
+.guide-bubble { position: absolute; left: 36px; top: -6px; white-space: nowrap; background: #fff; color: #17131F; font-size: 13px; font-weight: 800; border-radius: 999px; padding: 4px 8px; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+.guide-hot { outline: 3px solid #1F7A4D; outline-offset: 3px; border-radius: 14px; }
+@keyframes guide-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+@keyframes guide-step { 0%, 100% { transform: rotate(22deg); } 50% { transform: rotate(-22deg); } }
+@keyframes guide-dance { 0%, 100% { translate: 0 0; rotate: -16deg; } 50% { translate: 0 -14px; rotate: 16deg; } }
 .ama-pill { height: 34px; padding: 0 14px; border-radius: 10px; border: 0; font-size: 13px; font-weight: 600; background: #EFEDE4; color: #4A4943; }
 .ama-pill.on { background: #1F1E1D; color: #fff; }
 h1, h2 { font-family: var(--font-serif), Georgia, serif; font-weight: 600; letter-spacing: -.01em; }

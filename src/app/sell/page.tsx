@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import LiveCamera from "@/components/LiveCamera";
 import { CATEGORIES, CONDITIONS } from "@/lib/listings";
+import { readPosition, shareOrWhatsApp } from "@/lib/native";
 
 type Mine = { id: string; slug: string; title: string; price_ngn: number; status: string; private_sale: boolean };
 
@@ -24,7 +25,7 @@ export default function Sell() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setToken(data.session?.access_token || null); setReady(true); });
-    navigator.geolocation?.getCurrentPosition((p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }), () => {}, { timeout: 5000 });
+    readPosition({ timeout: 5000, maximumAge: 60000 }).then((p) => setCoords({ lat: p.coords.latitude, lng: p.coords.longitude })).catch(() => {});
   }, []);
   useEffect(() => {
     if (!token) return;
@@ -37,11 +38,20 @@ export default function Sell() {
     const { data } = await supabase.rpc("my_listings");
     setMine((data as Mine[]) || []);
   }
+  // Fetch that gives up after 40s and tries once more, so a weak connection never leaves the screen stuck.
+  async function sturdyFetch(url: string, init: RequestInit): Promise<Response | null> {
+    for (let i = 0; i < 2; i++) {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 40000);
+      try { return await fetch(url, { ...init, signal: ctl.signal }); } catch { /* try again */ } finally { clearTimeout(t); }
+    }
+    return null;
+  }
   async function upload(file: Blob, pos?: { lat: number; lng: number } | null): Promise<string | null> {
     const fd = new FormData(); fd.append("file", new File([file], "shot.jpg", { type: "image/jpeg" })); fd.append("live", "1");
     if (pos) { fd.append("lat", String(pos.lat)); fd.append("lng", String(pos.lng)); }
-    const r = await fetch("/api/listings/photo", { method: "POST", headers: auth(), body: fd });
-    const j = await r.json();
+    const r = await sturdyFetch("/api/listings/photo", { method: "POST", headers: auth(), body: fd });
+    if (!r) { setErr("Your connection is weak. Take the photo again when the signal is better."); return null; }
+    const j = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(j.error || "Upload failed"); return null; }
     return j.path;
   }
@@ -59,8 +69,9 @@ export default function Sell() {
   }
   async function submit() {
     setErr(""); setBusy(true);
-    const r = await fetch("/api/listings", { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify({ ...f, price: f.price.replace(/,/g, ""), photos, proof, proof_code: code, ...(coords || {}) }) });
-    const j = await r.json();
+    const r = await sturdyFetch("/api/listings", { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify({ ...f, price: f.price.replace(/,/g, ""), photos, proof, proof_code: code, ...(coords || {}) }) });
+    if (!r) { setBusy(false); setErr("Your connection is weak. Your photos are kept, so tap Post again."); return; }
+    const j = await r.json().catch(() => ({}));
     setBusy(false);
     if (!r.ok) { setErr(j.error || "Could not post"); return; }
     setDone(`${window.location.origin}/p/${j.slug}`);
@@ -89,7 +100,7 @@ export default function Sell() {
         <h1 style={{ fontSize: 24, margin: "8px 0" }}>Your listing is live!</h1>
         <p style={{ color: "#555", fontSize: 15 }}>Share the link. When people receive it on WhatsApp they will see the photo, price and title straight away, and tap only if they are interested.</p>
         <div style={{ wordBreak: "break-all", fontSize: 13, background: "#f4fbf6", border: "1px solid #cfe9d8", padding: 10, borderRadius: 10, margin: "12px 0" }}>{done}</div>
-        <button type="button" onClick={() => { if (navigator.share) navigator.share({ title: f.title, text, url: done }).catch(() => {}); else window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank"); }} style={{ display: "block", width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#25d366", color: "#fff", fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Share</button>
+        <button type="button" onClick={() => { shareOrWhatsApp({ title: f.title, text, url: done }); }} style={{ display: "block", width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#25d366", color: "#fff", fontWeight: 800, fontSize: 16, marginBottom: 8 }}>Share</button>
         <button type="button" onClick={() => { navigator.clipboard?.writeText(done); setCopied(true); }} style={{ width: "100%", padding: 14, borderRadius: 12, border: "none", background: "#0a7a3d", color: "#fff", fontWeight: 800, fontSize: 16, marginBottom: 8 }}>{copied ? "Link copied ✓" : "Copy link"}</button>
         <a href={done.replace(window.location.origin, "")} style={{ display: "block", padding: 14, borderRadius: 12, background: "#f1f1f1", color: "#17131F", fontWeight: 700, textDecoration: "none", marginBottom: 8 }}>View my listing</a>
         <button type="button" onClick={() => { setDone(""); setCopied(false); setF({ ...f, title: "", price: "", included: "", reason: "", extra: "", faults: "None" }); window.scrollTo(0, 0); }} style={{ background: "none", border: "none", color: "#0a7a3d", fontWeight: 700, fontSize: 15, minHeight: 44 }}>List another item</button>

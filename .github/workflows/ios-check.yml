@@ -19,6 +19,7 @@ jobs:
           npm install
           npx cap add ios
           npx cap sync ios
+          sh patch-plist.sh
       - name: Build for simulator (unsigned)
         working-directory: mobile/ios
         run: |

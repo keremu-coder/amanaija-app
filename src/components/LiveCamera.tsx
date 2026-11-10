@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { readPosition } from "@/lib/native";
 
 type Pos = { lat: number; lng: number } | null;
 
@@ -21,14 +22,17 @@ export default function LiveCamera({ label, onShot, max = 1, count = 0 }: { labe
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
       stream.current = s; setOn(true);
-      navigator.geolocation?.getCurrentPosition((p) => { pos.current = { lat: p.coords.latitude, lng: p.coords.longitude }; }, () => {}, { timeout: 6000, maximumAge: 60000 });
+      readPosition({ timeout: 6000, maximumAge: 60000 }).then((p) => { pos.current = { lat: p.coords.latitude, lng: p.coords.longitude }; }).catch(() => {});
       setTimeout(() => { if (vid.current) { vid.current.srcObject = s; vid.current.play().catch(() => {}); } }, 50);
     } catch { setErr("Please allow the camera to take your photo."); }
   }
   function snap() {
     const v = vid.current; if (!v || !v.videoWidth) return;
-    const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
-    c.getContext("2d")!.drawImage(v, 0, 0);
+    // Shrink on the phone before sending: the server keeps 1280px anyway, so nothing is lost,
+    // and a photo goes from ~2 MB to ~200 KB, which is what makes posting work on weak data.
+    const k = Math.min(1, 1280 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    c.getContext("2d")!.drawImage(v, 0, 0, c.width, c.height);
     c.toBlob((b) => {
       if (!b) return;
       onShot(b, pos.current);
@@ -36,7 +40,7 @@ export default function LiveCamera({ label, onShot, max = 1, count = 0 }: { labe
       if (navigator.vibrate) navigator.vibrate(30);
       const n = taken + 1; setTaken(n);
       if (max === 1 || count + n >= max) setTimeout(stop, 350); // single photo or full: camera closes by itself
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.8);
   }
   const btn = { padding: "12px 16px", borderRadius: 12, border: "none", fontWeight: 700, fontSize: 16, background: "#0a7a3d", color: "#fff" } as const;
   const full = max > 1 && count >= max;

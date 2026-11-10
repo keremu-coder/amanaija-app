@@ -1,0 +1,27 @@
+name: Access checks
+
+# Runs the access checks in tests/security against the live site on every push and pull request, and on demand.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm ci
+      - name: Write env for the checks
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://tnlrdxcgyzfcuhxdosfs.supabase.co' }}" > .env.local
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_SiByzSEGg3dHmeUYo9xiHQ_oZkTIm3i' }}" >> .env.local
+      - name: Run checks
+        run: |
+          node tests/security/access-checks.mjs
+          node tests/security/live-checks.mjs

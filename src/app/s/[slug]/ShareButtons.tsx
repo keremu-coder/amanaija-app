@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { shareOrWhatsApp } from "@/lib/native";
 
 export default function ShareButtons({ name }: { name: string }) {
   const [copied, setCopied] = useState(false);
@@ -17,15 +18,10 @@ export default function ShareButtons({ name }: { name: string }) {
     }
   };
 
-  const wa = () => {
-    const text = `${name} on AmaNaija: ${href()}`;
-    window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
-  };
-
   return (
     <div className="flex gap-2">
       <button
-        onClick={wa}
+        onClick={() => shareOrWhatsApp({ title: name, text: `${name} on AmaNaija`, url: href() })}
         className="flex-1 rounded-full bg-[#1F7A4D] px-4 py-3 text-[14px] font-bold text-white active:scale-95"
       >
         Share on WhatsApp

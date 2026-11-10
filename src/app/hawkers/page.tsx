@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { notifyOther } from "@/lib/push";
+import { readPosition } from "@/lib/native";
 
 type H = { id: string; name: string; items: string; lat: number; lng: number; minutes_ago: number };
 const km = (aLat: number, aLng: number, bLat: number, bLng: number) => Math.sqrt(((bLat - aLat) * 111) ** 2 + ((bLng - aLng) * 111 * Math.cos((aLat * Math.PI) / 180)) ** 2);
@@ -18,11 +19,9 @@ export default function Hawkers() {
     setList((data as H[]) || []);
   }
   useEffect(() => {
-    if (!navigator.geolocation) { setErr("Your phone did not share a location."); setList([]); return; }
-    navigator.geolocation.getCurrentPosition(
+    readPosition({ timeout: 10000, maximumAge: 60000 }).then(
       (p) => { const c = { lat: p.coords.latitude, lng: p.coords.longitude }; setMe(c); load(c.lat, c.lng); },
-      () => { setErr("Allow location to see hawkers walking near you."); setList([]); },
-      { timeout: 10000, maximumAge: 60000 }
+      () => { setErr("Allow location to see hawkers walking near you."); setList([]); }
     );
     const t = setInterval(() => { if (!document.hidden && me) load(me.lat, me.lng); }, 30000);
     return () => clearInterval(t);

@@ -25,10 +25,14 @@ export default function PersonCard({ person, myName, onClose }: { person: { uid?
     const u = await needLogin(); if (!u) return;
     if (u.id === person.uid) { setMsg({ t: "That is you.", ok: false }); return; }
     setBusy(true);
-    const { error } = await supabase.from("dm_requests").insert({ to_id: person.uid, from_name: myName.slice(0, 40) || "Neighbour", body });
+    const via = await supabase.rpc("hello_neighbor", { p_to: person.uid, p_name: "Neighbour", p_body: body });
+    const missing = via.error && /hello_neighbor|schema cache|Could not find the function/i.test(via.error.message);
+    const { error } = missing
+      ? await supabase.from("dm_requests").insert({ to_id: person.uid, from_name: "Neighbour", body })
+      : via;
     setBusy(false);
     if (error) {
-      setMsg({ t: (error as any).code === "23505" ? "You already sent this person a request." : error.message.includes("Too many") ? "Too many requests. Please wait a little." : "Could not send. They may not accept messages.", ok: false });
+      setMsg({ t: /already sent/i.test(error.message) ? "You already sent this person a request." : /too many/i.test(error.message) ? "Too many requests. Please wait a little." : /not open/i.test(error.message) ? "They are not open to hello." : "Could not send. They may not accept messages.", ok: false });
       return;
     }
     setText(""); notifyOther({ to: person.uid });

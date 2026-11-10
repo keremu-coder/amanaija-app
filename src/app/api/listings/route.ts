@@ -37,11 +37,11 @@ export async function POST(req: Request) {
   if (photos.some((p) => !own.has(p)) || !own.has(proof)) return Response.json({ error: "Add 2 to 7 of your own photos and the proof photo" }, { status: 400 });
   if (code !== proofCodeFor(uid, 0) && code !== proofCodeFor(uid, 1)) return Response.json({ error: "Your proof code has expired. Reload the page for a new one." }, { status: 400 });
 
-  // New sellers start small. Two completed sales raise the limit.
+  // Non-admins stay at 3 active listings and ₦500,000.
+  // Sellers can mark their own listing sold, so that count is not a completed sale.
   const { count: active } = await adminDb.from("listings").select("id", { count: "exact", head: true }).eq("seller_id", uid).in("status", ["active", "reserved"]);
-  const { count: sold } = await adminDb.from("listings").select("id", { count: "exact", head: true }).eq("seller_id", uid).eq("status", "sold");
   const { data: prof } = await adminDb.from("profiles").select("is_admin").eq("id", uid).maybeSingle();
-  const cap = prof?.is_admin ? 1000 : 3; // raised only once sales are completed through AmaNaija
+  const cap = prof?.is_admin ? 1000 : 3;
   if (!prof?.is_admin && price > 500000) return Response.json({ error: "New sellers can list items up to ₦500,000 for now." }, { status: 400 });
   if ((active ?? 0) >= cap) return Response.json({ error: `You can have ${cap} active listings for now. Mark one as sold to add another.` }, { status: 400 });
 

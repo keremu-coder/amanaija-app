@@ -1,9 +1,11 @@
 "use client";
 
-import { IconAsk, IconMarket, IconPin, IconShop, IconTrack } from "@/components/Icons";
+import { IconAsk, IconHome, IconMarket, IconPin, IconShop, IconTrack } from "@/components/Icons";
 import { AlertsButton, SoundToggle } from "@/components/SoundFx";
+import { hapticTap, readPosition } from "@/lib/native";
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import StreetView from "@/components/StreetView";
 import ShopLinkBox from "@/components/ShopLinkBox";
 import HomeRentToggle from "@/components/HomeRentToggle";
@@ -13,7 +15,11 @@ import BookingBox from "@/components/BookingBox";
 import ShopBookingsInbox from "@/components/ShopBookingsInbox";
 import AbaRoom from "@/components/AbaRoom";
 import LoungeScene from "@/components/LoungeScene";
+import PlaceRoom from "@/components/PlaceRoom";
+import GuideWalker from "@/components/GuideWalker";
 import { supabase } from "@/lib/supabase";
+import type { Life } from "@/lib/life";
+import { readCachedLife, setOut } from "@/lib/life";
 
 const AmaMap = dynamic(() => import("@/components/AmaMap"), { ssr: false, loading: () => <div className="absolute inset-0 flex items-center justify-center bg-[#F4F1EA] text-sm font-bold text-[#165C3A]">Loading your map…</div> });
 
@@ -70,15 +76,54 @@ export default function Home() {
 
   const [isInRoom, setIsInRoom] = useState(false);
   const [viewMode, setViewModeRaw] = useState<"lounge" | "map">("lounge");
+  const [booted, setBooted] = useState(false);
   const setViewMode = (m: "lounge" | "map") => {
     setViewModeRaw(m);
     try { sessionStorage.setItem("amanaija_view", m); } catch {}
   };
-  // Refreshing the page keeps you on the map instead of throwing you back Home.
-  useEffect(() => {
-    try { if (sessionStorage.getItem("amanaija_view") === "map") setViewModeRaw("map"); } catch {}
-  }, []);
   const [showRealMap, setShowRealMap] = useState(true);
+  const [myLife, setMyLife] = useState<Life | null>(null);
+  const [inside, setInside] = useState<Life | null>(null);
+  const rememberWhere = (where: "lounge" | "street" | "room" | "map" | "aba") => {
+    try { localStorage.setItem("amanaija_where", where); } catch {}
+  };
+  const enterLife = (life: Life) => {
+    if (!user || life.user_id !== user.id) return;
+    rememberWhere("room");
+    setInside(life);
+    setOut(supabase, user.id, false);
+  };
+  const leaveLife = () => {
+    rememberWhere("street");
+    setInside(null);
+    if (user) setOut(supabase, user.id, true);
+  };
+  useEffect(() => {
+    let where = "lounge";
+    try { where = localStorage.getItem("amanaija_where") || "lounge"; } catch {}
+    let cam: { longitude?: number; latitude?: number; zoom?: number } | null = null;
+    try { cam = JSON.parse(localStorage.getItem("amanaija_cam") || "null"); } catch {}
+    const cached = readCachedLife();
+    if (cached && cached.lat != null && cached.lng != null) setMyLife(cached);
+    if (cam && Number.isFinite(cam.latitude) && Number.isFinite(cam.longitude) && Number.isFinite(cam.zoom)) {
+      setViewState({ longitude: cam.longitude as number, latitude: cam.latitude as number, zoom: cam.zoom as number });
+      setUserLocation({ lng: cam.longitude as number, lat: cam.latitude as number });
+    } else if (cached?.lat != null && cached.lng != null && where !== "lounge") {
+      setViewState({ longitude: cached.lng, latitude: cached.lat, zoom: 16 });
+      setUserLocation({ lng: cached.lng, lat: cached.lat });
+    }
+    if (where === "aba") setIsInRoom(true);
+    else if (where === "map" || where === "street" || where === "room") {
+      setViewModeRaw("map");
+      setShowRealMap(where === "map");
+      if (where === "room" && cached) setInside(cached);
+    }
+    setBooted(true);
+  }, []);
+  useEffect(() => {
+    if (!booted) return;
+    try { localStorage.setItem("amanaija_cam", JSON.stringify(viewState)); } catch {}
+  }, [booted, viewState]);
   const placesLoaded = useRef(false);
 
   const [isTracking, setIsTracking] = useState(false);
@@ -88,30 +133,46 @@ export default function Home() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user || null);
+      const next = session?.user || null;
+      setUser(next);
+      if (!next) return;
+      let where = "street";
+      try { where = localStorage.getItem("amanaija_where") || "street"; } catch {}
+      setOut(supabase, next.id, where !== "room");
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
     });
 
-    fetchPlaces();
-    return () => authListener.subscription.unsubscribe();
+    const stopPlaces = fetchPlaces();
+    return () => { authListener.subscription.unsubscribe(); stopPlaces(); };
   }, []);
 
-  const fetchPlaces = async () => {
+  const fetchPlaces = () => {
     // Show last known places instantly, then refresh from the server.
     try {
       const cached = localStorage.getItem("amanaija_places_v1");
       if (cached && !placesLoaded.current) setPlaces(JSON.parse(cached));
     } catch {}
-    const { data, error } = await supabase.from('places').select('*');
-    if (!error && data) {
-      placesLoaded.current = true;
-      setPlaces(data);
-      setDbStatus(`Connected (${data.length} places)`);
-      try { const j = JSON.stringify(data); if (j.length < 1500000) localStorage.setItem("amanaija_places_v1", j); } catch {}
+    const pull = async () => {
+      const { data, error } = await supabase.from('places').select('*');
+      if (!error && data) {
+        placesLoaded.current = true;
+        setPlaces(data);
+        setDbStatus(`Connected (${data.length} places)`);
+        try { const j = JSON.stringify(data); if (j.length < 1500000) localStorage.setItem("amanaija_places_v1", j); } catch {}
+      }
+    };
+    let cancel = () => {};
+    if (typeof requestIdleCallback === "function") {
+      const id = requestIdleCallback(() => { pull(); }, { timeout: 1500 });
+      cancel = () => cancelIdleCallback(id);
+    } else {
+      const id = window.setTimeout(pull, 400);
+      cancel = () => window.clearTimeout(id);
     }
+    return cancel;
   };
 
   const handleSelectPlace = async (place: any) => {
@@ -150,9 +211,7 @@ export default function Home() {
 
     setIsClaiming(true);
     try {
-      const currentPos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
-      });
+      const currentPos = await readPosition({ enableHighAccuracy: true });
       
       const R = 6371e3;
       const phi1 = claimingExistingPlace.lat * Math.PI/180;
@@ -227,9 +286,7 @@ export default function Home() {
         throw new Error(collisionMessage);
       }
 
-      const currentPos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
-      });
+      const currentPos = await readPosition({ enableHighAccuracy: true });
 
       const phi1_gps = userLocation.lat * Math.PI/180;
       const phi2_gps = currentPos.coords.latitude * Math.PI/180;
@@ -427,6 +484,7 @@ export default function Home() {
     setOrderError("");
 
     try {
+      let phoneProof: string | null = null;
       if (!user && !isVerified) {
         if (otpCode.length !== 6) {
           throw new Error("Please enter the 6-digit code.");
@@ -437,11 +495,13 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: guestPhone, code: otpCode }),
         });
+        const verifyJson = await verifyRes.json();
         
         if (!verifyRes.ok) {
-          const verifyJson = await verifyRes.json();
           throw new Error(verifyJson.error || "Invalid or expired OTP code.");
         }
+        phoneProof = typeof verifyJson.phone_proof === "string" ? verifyJson.phone_proof : null;
+        if (!phoneProof) throw new Error("Please verify your phone number first.");
       }
 
       let encAddress = null;
@@ -473,7 +533,8 @@ export default function Home() {
         p_encrypted_address: encAddress,
         p_address_iv: iv,
         p_address_auth_tag: authTag,
-        p_booking_time: guestBookingTime || null
+        p_booking_time: guestBookingTime || null,
+        p_phone_proof: phoneProof
       });
 
       if (orderError) {
@@ -537,12 +598,69 @@ export default function Home() {
     setTimeout(fire, 700);
   };
 
+  useEffect(() => {
+    const onDo = (e: Event) => {
+      const act = (e as CustomEvent<string>).detail;
+      if (act === "shops") { openPanel("list"); return; }
+      if (act === "market") { window.location.href = "/market"; return; }
+      if (act === "place") {
+        if (myLife) enterLife(myLife);
+        else { rememberWhere("lounge"); setViewMode("lounge"); }
+        return;
+      }
+      if (act !== "street") return;
+      readPosition({ enableHighAccuracy: false, timeout: 10000, maximumAge: 120000 }).then(
+        (pos) => {
+          setViewState({ longitude: pos.coords.longitude, latitude: pos.coords.latitude, zoom: 16 });
+          setUserLocation({ lng: pos.coords.longitude, lat: pos.coords.latitude });
+          rememberWhere("map");
+          setShowRealMap(true);
+          setViewMode("map");
+        },
+        () => {
+          if (myLife?.lat == null || myLife.lng == null) return;
+          setViewState({ longitude: myLife.lng, latitude: myLife.lat, zoom: 16 });
+          setShowRealMap(true);
+          setViewMode("map");
+        }
+      );
+    };
+    window.addEventListener("amanaija-guide-do", onDo);
+    return () => window.removeEventListener("amanaija-guide-do", onDo);
+  }, [myLife, showRealMap]);
+
+  useEffect(() => {
+    const onShow = (e: Event) => {
+      const act = (e as CustomEvent<string>).detail;
+      setIsInRoom(false);
+      if (act === "street") {
+        rememberWhere("lounge");
+        setViewMode("lounge");
+        return;
+      }
+      rememberWhere("map");
+      setViewMode("map");
+      setShowRealMap(true);
+      setSheetMin(true);
+    };
+    window.addEventListener("amanaija-guide-show", onShow);
+    return () => window.removeEventListener("amanaija-guide-show", onShow);
+  }, []);
+
   const handleTrackOrder = async () => {
     if (!trackCode) return;
     setTrackError("");
     
     let token: string | null = null;
     try { token = localStorage.getItem(`track_${trackCode}`); } catch {}
+    if (!token) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        setTrackError("Open this on the phone you ordered with, or log in.");
+        setTrackedOrder(null);
+        return;
+      }
+    }
     const { data, error } = await supabase.rpc('get_order_by_code', {
       p_short_code: trackCode,
       p_token: token
@@ -604,32 +722,44 @@ export default function Home() {
 
   return (
     <main className="relative w-full h-dvh overflow-hidden bg-[#F2F6F3]">
-      
-      {isInRoom ? (
-        <AbaRoom onExit={() => setIsInRoom(false)} />
+      {!booted ? null : isInRoom ? (
+        <AbaRoom onExit={() => { rememberWhere("lounge"); setIsInRoom(false); }} />
       ) : viewMode === "lounge" ? (
         <LoungeScene
-          onEnterRoom={() => setIsInRoom(true)}
-          onOpenMap={() => setViewMode("map")}
-          onOpenShopOwner={() => { setViewMode("map"); }}
+          onEnterRoom={() => { rememberWhere("aba"); setIsInRoom(true); }}
+          onOpenMap={() => { rememberWhere("map"); setShowRealMap(true); setViewMode("map"); }}
+          onOpenShopOwner={() => { rememberWhere("map"); setShowRealMap(true); setViewMode("map"); }}
           onSelectLocation={(lat: number, lng: number) => {
             setViewState({ longitude: lng, latitude: lat, zoom: 16 });
             setUserLocation({ lng, lat });
             setShowRealMap(true);
+            rememberWhere("map");
             setViewMode("map");
           }}
           userName={user?.email?.split("@")[0] || ""}
           placeCount={places.length}
+          userId={user?.id || null}
+          onLife={setMyLife}
+          onEnterLife={enterLife}
+          life={myLife}
+          onShowStreet={() => {
+            if (myLife?.lat != null && myLife?.lng != null) {
+              setViewState({ longitude: myLife.lng, latitude: myLife.lat, zoom: 16 });
+            }
+            rememberWhere("street");
+            setShowRealMap(false);
+            setViewMode("map");
+          }}
         />
       ) : (
         <>
           {showRealMap ? (
             <>
-              <AmaMap viewState={viewState} setViewState={setViewState} userLocation={userLocation} setUserLocation={setUserLocation} places={places} onSelectPlace={handleSelectPlace} userName={user?.email?.split("@")[0] || ""} />
-              <button onClick={() => setViewMode("lounge")} className="absolute left-3 top-3 z-20 h-11 rounded-full bg-white px-4 text-sm font-bold text-[#17131F] shadow">Home</button>
+              <AmaMap viewState={viewState} setViewState={setViewState} userLocation={userLocation} setUserLocation={setUserLocation} places={places} onSelectPlace={handleSelectPlace} userName={user?.email?.split("@")[0] || ""} userId={user?.id || null} myLife={myLife} onEnterLife={enterLife} onLived={setMyLife} />
+              <button onClick={() => { rememberWhere("lounge"); setViewMode("lounge"); }} className="absolute left-3 top-3 z-20 h-11 rounded-full bg-white px-4 text-sm font-bold text-[#17131F] shadow">Home</button>
             </>
           ) : (
-            <StreetView places={places} center={{ lat: viewState.latitude, lng: viewState.longitude }} userName={user?.email?.split("@")[0] || ""} onSelectPlace={handleSelectPlace} onBack={() => setViewMode("lounge")} onOpenRealMap={() => setShowRealMap(true)} />
+            <StreetView places={places} center={{ lat: viewState.latitude, lng: viewState.longitude }} userName={user?.email?.split("@")[0] || ""} onSelectPlace={handleSelectPlace} onBack={() => { rememberWhere("lounge"); setViewMode("lounge"); }} onOpenRealMap={() => { rememberWhere("map"); setShowRealMap(true); }} onEnterLife={enterLife} userId={user?.id || null} hasLife={!!myLife} onStood={(life) => { setMyLife(life); rememberWhere("street"); }} />
           )}
 
           <div className={sheetMin ? "ama-dock absolute bottom-6 left-1/2 transform -translate-x-1/2 w-[92%] max-w-md z-10 p-2 max-h-[80dvh] overflow-y-auto overflow-x-hidden [&>*:not(.sheet-keep)]:hidden" : "ama-dock absolute bottom-6 left-1/2 transform -translate-x-1/2 w-[92%] max-w-md z-10 p-5 max-h-[80dvh] overflow-y-auto overflow-x-hidden"}>
@@ -641,12 +771,13 @@ export default function Home() {
                 <button type="button" onClick={() => setSheetMin(true)} className="mb-2 flex h-11 items-center gap-1 rounded-full bg-[#F2F6F3] px-4 text-sm font-bold text-[#2E4A36] active:scale-95">&larr; Back to map</button>
               )}
               {sheetMin && (
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => openPanel("list")} className="ama-tab hot"><span className="ic"><IconPin /></span>Nearby</button>
-                  <button type="button" onClick={() => openPanel("ask")} className="ama-tab"><span className="ic"><IconAsk /></span>Need it</button>
-                  <a href="/market" className="ama-tab"><span className="ic"><IconMarket /></span>Market</a>
-                  <button type="button" onClick={() => { setIsTracking(true); setSheetMin(false); }} className="ama-tab"><span className="ic"><IconTrack /></span>Track</button>
-                  <button type="button" onClick={() => setSheetMin(false)} className="ama-tab"><span className="ic"><IconShop /></span>{user ? "My shop" : "Shop"}</button>
+                <div className="flex">
+                  <button type="button" data-guide="place" onClick={() => { hapticTap(); if (myLife) enterLife(myLife); else { rememberWhere("lounge"); setViewMode("lounge"); } }} className="ama-tab"><span className="ic"><IconHome /></span>My place</button>
+                  <button type="button" data-guide="shops" onClick={() => { hapticTap(); openPanel("list"); }} className="ama-tab"><span className="ic"><IconPin /></span>Nearby</button>
+                  <button type="button" onClick={() => { hapticTap(); openPanel("ask"); }} className="ama-tab"><span className="ic"><IconAsk /></span>Need it</button>
+                  <Link href="/market" data-guide="market" onClick={() => hapticTap()} className="ama-tab"><span className="ic"><IconMarket /></span>Market</Link>
+                  <button type="button" onClick={() => { hapticTap(); setIsTracking(true); setSheetMin(false); }} className="ama-tab"><span className="ic"><IconTrack /></span>Track</button>
+                  <button type="button" onClick={() => { hapticTap(); setSheetMin(false); }} className="ama-tab"><span className="ic"><IconShop /></span>{user ? "My shop" : "Shop"}</button>
                 </div>
               )}
             </div>
@@ -1089,10 +1220,10 @@ export default function Home() {
                   <button type="button" onClick={() => setIsInRoom(true)} className="ama-row"><span>Visit Aba Room</span><i>›</i></button>
                   <button type="button" onClick={() => setIsTracking(true)} className="ama-row"><span>Track an order</span><i>›</i></button>
                   {user && <button type="button" onClick={handleViewMyOrders} className="ama-row"><span>My orders</span><i>›</i></button>}
-                  <a href="/market" className="ama-row"><span>Market</span><i>›</i></a>
+                  <Link href="/market" data-guide="market" className="ama-row"><span>Market</span><i>›</i></Link>
                   <a href="/hawkers" className="ama-row"><span>Hawkers near me</span><i>›</i></a>
                   {user && <a href="/hawk" className="ama-row"><span>I am hawking today</span><i>›</i></a>}
-                  {user && <a href="/sell" className="ama-row"><span>Sell something</span><i>›</i></a>}
+                  {user && <Link href="/sell" className="ama-row"><span>Sell something</span><i>›</i></Link>}
                   {user && <button type="button" onClick={() => setShowClaimForm(true)} className="ama-row"><span>Claim a location here</span><i>›</i></button>}
                 </div>
 
@@ -1145,6 +1276,16 @@ export default function Home() {
           </div>
         </>
       )}
+      {inside && (
+        <PlaceRoom
+          key={inside.user_id + inside.updated_at}
+          life={inside}
+          mine={!user || inside.user_id === user.id}
+          onClose={leaveLife}
+          onSaved={(row) => { setMyLife(row); enterLife(row); }}
+        />
+      )}
+      <GuideWalker />
     </main>
   );
 }

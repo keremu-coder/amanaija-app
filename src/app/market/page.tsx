@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cacheLife } from "next/cache";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import { CONDITIONS, publicPhoto } from "@/lib/listings";
 import MarketGrid from "@/components/MarketGrid";
@@ -21,7 +22,7 @@ export default async function Market() {
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "12px 16px 80px", fontFamily: "system-ui, sans-serif" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <a href="/" style={{ minHeight: 44, display: "inline-flex", alignItems: "center", fontWeight: 700, color: "#1F7A4D", textDecoration: "none" }}>← Map</a>
-        <a href="/sell" className="ama-primary" style={{ padding: "11px 18px", textDecoration: "none" }}>Sell something</a>
+        <Link href="/sell" className="ama-primary" style={{ padding: "11px 18px", textDecoration: "none" }}>Sell something</Link>
       </div>
       <h1 style={{ fontSize: 26, margin: "8px 0" }}>Market</h1>
       <p style={{ fontSize: 13, color: "#6B6A68", margin: 0 }}>Anyone can look. You log in only to message a seller or to sell.</p>

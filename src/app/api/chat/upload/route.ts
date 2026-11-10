@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { tooMany } from "@/lib/ratelimit";
+import { publicName, userFromReq } from "@/lib/authUser";
 import crypto from "crypto";
 import sharp from "sharp";
 import { stripVideoMeta } from "@/lib/stripVideoMeta";
@@ -44,10 +45,12 @@ export async function POST(req: Request) {
   const __limited = await tooMany(req, "chat-up", 10, 60);
   if (__limited) return __limited;
   try {
+    const user = await userFromReq(req);
+    if (!user) return Response.json({ error: "Please log in to speak." }, { status: 401 });
+    const userName = publicName(user);
     const form = await req.formData();
     const file = form.get("file");
     const clientId = String(form.get("client_id") || "");
-    const userName = String(form.get("user_name") || "Guest").slice(0, 20);
     const parentId = form.get("parent_id");
     const roomId = "aba-market";
 
@@ -124,11 +127,12 @@ export async function POST(req: Request) {
     // Store the proxy path, not the storage URL
     const proxyUrl = `/api/chat/media/${filename}`;
 
-    const { data, error: dbErr } = await supabaseAdmin
+    let { data, error: dbErr } = await supabaseAdmin
       .from("messages")
       .insert({
         room_id: roomId,
-        user_name: userName.slice(0, 20),
+        user_name: userName,
+        user_id: user.id,
         body: null,
         media_url: proxyUrl,
         media_type: isImage ? "photo" : "video",
@@ -137,6 +141,19 @@ export async function POST(req: Request) {
       })
       .select()
       .single();
+    if (dbErr && /user_id/i.test(dbErr.message || "")) {
+      const again = await supabaseAdmin.from("messages").insert({
+        room_id: roomId,
+        user_name: userName,
+        body: null,
+        media_url: proxyUrl,
+        media_type: isImage ? "photo" : "video",
+        parent_id: typeof parentId === "string" && parentId.length > 0 ? parentId : null,
+        client_id: clientId,
+      }).select().single();
+      data = again.data;
+      dbErr = again.error;
+    }
 
     if (dbErr) {
       return Response.json({ error: dbErr.message }, { status: 500 });

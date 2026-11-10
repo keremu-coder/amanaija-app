@@ -7,3 +7,4 @@ export const IconAsk = (): ReactElement => <svg {...base}><circle cx="11" cy="11
 export const IconMarket = (): ReactElement => <svg {...base}><path d="M4 9h16l-1 11H5L4 9z" /><path d="M8 9V7a4 4 0 0 1 8 0v2" /></svg>;
 export const IconTrack = (): ReactElement => <svg {...base}><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="18" r="1.6" /><circle cx="17" cy="18" r="1.6" /></svg>;
 export const IconShop = (): ReactElement => <svg {...base}><path d="M3 10l1.5-5h15L21 10M4 10v10h16V10M9 20v-6h6v6" /></svg>;
+export const IconHome = (): ReactElement => <svg {...base}><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1z" /></svg>;

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { readPosition } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 
 // For people who sell while walking (groundnut, pure water, bread, recharge cards...). Opt-in, about 500 m accuracy, ends by itself after 3 hours.
@@ -13,7 +14,7 @@ export default function Hawk() {
   const [msg, setMsg] = useState("");
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pos = () => new Promise<GeolocationPosition>((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }));
+  const pos = () => readPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
 
   async function push() {
     const p = await pos();

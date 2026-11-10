@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { unlockAudio, playProfile, SOUND_PROFILES, SoundProfileId } from "@/lib/sounds";
 import { loadPrefs, savePrefs } from "@/lib/sound-prefs";
+import { hapticTap } from "@/lib/native";
 import { ChatComposer } from "./ChatComposer";
 
 const FONTS = [
@@ -92,6 +93,8 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
+  const tokenRef = useRef<string | null>(null);
   const [replyTo, setReplyTo] = useState<any>(null);
   const [showProfile, setShowProfile] = useState<any>(null);
   const [showSafetyMenu, setShowSafetyMenu] = useState(false);
@@ -152,10 +155,16 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user?.email) {
-        const name = session.user.email.split('@')[0];
-        setUserName(name);
-        const { data } = await supabase.from('blocks').select('blocked_name').eq('blocker_id', session.user.id);
-        if (data) setBlockedUsers(data.map(b => b.blocked_name));
+        const front = session.user.email.split("@")[0].replace(/[^\w\s\-\.]/g, "").trim().slice(0, 14) || "Member";
+        const tail = session.user.id.replace(/-/g, "").slice(0, 4);
+        setUserName(`${front}-${tail}`.slice(0, 20));
+        tokenRef.current = session.access_token;
+        const { data } = await supabase.from('blocks').select('blocked_name, blocked_user_id').eq('blocker_id', session.user.id);
+        const rows = (data || (await supabase.from('blocks').select('blocked_name').eq('blocker_id', session.user.id)).data || []) as { blocked_name: string; blocked_user_id?: string }[];
+        if (rows) {
+          setBlockedUsers(rows.map((b) => b.blocked_name));
+          setBlockedIds(rows.map((b) => b.blocked_user_id).filter((x): x is string => !!x));
+        }
       }
     });
   }, []);
@@ -178,8 +187,12 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   const fetchAllData = async () => {
     const { data: msgs } = await supabase.from('messages').select('*').eq('room_id', 'aba-market').order('created_at', { ascending: true }).limit(50);
     if (msgs) {
-      const { data: reacts } = await supabase.from('message_reactions').select('*');
-      const msgsWithReacts = msgs.map(m => ({ ...m, message_reactions: reacts ? reacts.filter(r => r.message_id === m.id) : [] }));
+      const shown = msgs.filter((m) => m.user_id !== null);
+      const ids = shown.map((m) => m.id).filter(Boolean);
+      const { data: reacts } = ids.length
+        ? await supabase.from('message_reactions').select('message_id,user_name,emoji,user_id').in('message_id', ids)
+        : { data: [] as { message_id: string }[] };
+      const msgsWithReacts = shown.map(m => ({ ...m, message_reactions: reacts ? reacts.filter(r => r.message_id === m.id) : [] }));
       setMessages(msgsWithReacts);
     }
   };
@@ -189,9 +202,10 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
     const channel = supabase
       .channel('aba-market-chat')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'room_id=eq.aba-market' }, (payload) => {
-        const newMsg = payload.new;
-        if (newMsg.user_name !== userName) playProfile(soundProfile, "receive");
-        if (newMsg.body) showBubble(newMsg.user_name, newMsg.body);
+        const newMsg = payload.new as { id?: string; user_id?: string | null; user_name?: string; body?: string | null };
+        if (newMsg.user_id === null) return;
+        if (newMsg.user_name && newMsg.user_name !== userName) playProfile(soundProfile, "receive");
+        if (newMsg.body) showBubble(newMsg.user_name || "Member", newMsg.body);
         setMessages((prev) => {
           if (prev.find(m => m.id === newMsg.id)) return prev;
           const tempIndex = prev.findIndex(m => m.id.startsWith('temp-') && m.body === newMsg.body && m.user_name === newMsg.user_name);
@@ -215,6 +229,8 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
+    if (!tokenRef.current) { alert("Please log in to speak."); return; }
+    hapticTap();
     const msg = newMessage;
     const currentReply = replyTo;
     setNewMessage("");
@@ -228,7 +244,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
     try {
       const res = await fetch("/api/chat/message", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
         body: JSON.stringify({
           body: msg,
           parent_id: currentReply?.id || null,
@@ -248,6 +264,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   };
 
   const handleSendMedia = async (file: File) => {
+    if (!tokenRef.current) { alert("Please log in to speak."); return; }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("client_id", clientId);
@@ -255,7 +272,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
     if (replyTo?.id) fd.append("parent_id", replyTo.id);
 
     try {
-      const res = await fetch("/api/chat/upload", { method: "POST", body: fd });
+      const res = await fetch("/api/chat/upload", { method: "POST", headers: { Authorization: `Bearer ${tokenRef.current}` }, body: fd });
       const json = await res.json();
       if (!res.ok) {
         alert(json.error || "Upload failed");
@@ -335,6 +352,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   };
 
   const addReaction = async (messageId: string, emoji: string) => {
+    if (!tokenRef.current) return;
     setMessages(prev => prev.map(m => {
       if (m.id === messageId) {
         const existing = m.message_reactions?.find((r: any) => r.user_name === userName && r.emoji === emoji);
@@ -343,7 +361,11 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
       }
       return m;
     }));
-    await supabase.from('message_reactions').insert([{ message_id: messageId, user_name: userName, emoji }]);
+    await fetch("/api/chat/react", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokenRef.current}` },
+      body: JSON.stringify({ message_id: messageId, emoji }),
+    });
   };
 
   const deleteMessage = async (messageId: string) => {
@@ -352,11 +374,15 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
     await supabase.from('messages').delete().eq('id', messageId);
   };
 
-  const blockUser = async (targetName: string) => {
+  const blockUser = async (targetName: string, targetId?: string) => {
     setBlockedUsers(prev => [...prev, targetName]);
+    if (targetId) setBlockedIds(prev => [...prev, targetId]);
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) await supabase.from('blocks').insert([{ blocker_id: session.user.id, blocked_name: targetName }]);
-    else alert("Log in to block users permanently.");
+    if (!session) { alert("Log in to block users permanently."); return; }
+    const row: { blocker_id: string; blocked_name: string; blocked_user_id?: string } = { blocker_id: session.user.id, blocked_name: targetName };
+    if (targetId) row.blocked_user_id = targetId;
+    const { error } = await supabase.from('blocks').insert([row]);
+    if (error && targetId) await supabase.from('blocks').insert([{ blocker_id: session.user.id, blocked_name: targetName }]);
   };
 
   const reportMessage = async (msg: any) => {
@@ -369,7 +395,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const visibleMessages = messages.filter(m => !blockedUsers.includes(m.user_name));
+  const visibleMessages = messages.filter((m) => !(m.user_id && blockedIds.includes(m.user_id)));
 
   // People standing in the street: me first, then others who are not blocked
   const others = people.filter(p => p.key !== clientId && !blockedUsers.includes(p.name));
@@ -654,7 +680,7 @@ export default function AbaRoom({ onExit }: { onExit: () => void }) {
                     <span className="text-lg">&#128681;</span> Report
                   </button>
                   <button
-                    onClick={() => { blockUser(actionMessage.user_name); setActionMessage(null); }}
+                    onClick={() => { blockUser(actionMessage.user_name, actionMessage.user_id); setActionMessage(null); }}
                     className="w-full text-left px-5 py-3 hover:bg-gray-50 text-[15px] font-medium text-red-600 border-t border-gray-100 flex items-center gap-3"
                   >
                     <span className="text-lg">&#128683;</span> Block {actionMessage.user_name}

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { tooMany } from "@/lib/ratelimit";
+import { publicName, userFromReq } from "@/lib/authUser";
 import crypto from "crypto";
 
 const supabaseAdmin = createClient(
@@ -63,7 +64,9 @@ export async function POST(req: Request) {
   const __limited = await tooMany(req, "chat-msg", 30, 60);
   if (__limited) return __limited;
   try {
-    const { body, parent_id, client_id, user_name } = await req.json();
+    const user = await userFromReq(req);
+    if (!user) return Response.json({ error: "Please log in to speak." }, { status: 401 });
+    const { body, parent_id, client_id } = await req.json();
 
     if (typeof body !== "string" || !body.trim() || body.length > 500) {
       return Response.json({ error: "Invalid message body" }, { status: 400 });
@@ -72,15 +75,12 @@ export async function POST(req: Request) {
       return Response.json({ error: "Missing client_id" }, { status: 400 });
     }
 
-    const safeUserName = String(user_name || "Guest")
-      .replace(/[^\w\s\-\.]/g, "")
-      .trim()
-      .slice(0, 20) || "Guest";
+    const safeUserName = publicName(user);
 
-    if (!checkMem(`client:${client_id}`, 15, 60_000)) {
+    if (!checkMem(`user:${user.id}`, 15, 60_000)) {
       return Response.json({ error: "Slow down! Max 15 messages per minute." }, { status: 429 });
     }
-    if (!(await checkDb(`client:${client_id}`, "chat_message", 15, 60_000))) {
+    if (!(await checkDb(`user:${user.id}`, "chat_message", 15, 60_000))) {
       return Response.json({ error: "Slow down! Max 15 messages per minute." }, { status: 429 });
     }
 
@@ -95,17 +95,26 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data, error } = await supabaseAdmin
-      .from("messages")
-      .insert({
-        room_id: "aba-market",
-        user_name: safeUserName,
-        body: body.trim(),
-        parent_id: parent_id || null,
-        client_id,
-      })
-      .select()
-      .single();
+    const row = {
+      room_id: "aba-market",
+      user_name: safeUserName,
+      user_id: user.id,
+      body: body.trim(),
+      parent_id: parent_id || null,
+      client_id,
+    };
+    let { data, error } = await supabaseAdmin.from("messages").insert(row).select().single();
+    if (error && /user_id/i.test(error.message || "")) {
+      const again = await supabaseAdmin.from("messages").insert({
+        room_id: row.room_id,
+        user_name: row.user_name,
+        body: row.body,
+        parent_id: row.parent_id,
+        client_id: row.client_id,
+      }).select().single();
+      data = again.data;
+      error = again.error;
+    }
 
     if (error) {
       if (error.message?.includes("Rate limit")) {

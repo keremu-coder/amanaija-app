@@ -282,7 +282,8 @@ create table if not exists public.user_reports (
 );
 create table if not exists public.verified_phones (
   phone text not null,
-  verified_at timestamptz not null default now()
+  verified_at timestamptz not null default now(),
+  proof_hash text
 );
 -- public.app_errors is created by app_errors.sql
 
@@ -568,7 +569,8 @@ end;
 $$;
 
 create or replace function public.create_order(p_shop_id uuid, p_items jsonb, p_guest_name text, p_guest_phone text, p_buyer_id uuid,
-  p_phone_verified boolean, p_encrypted_address text, p_address_iv text, p_address_auth_tag text, p_booking_time timestamptz default null)
+  p_phone_verified boolean, p_encrypted_address text, p_address_iv text, p_address_auth_tag text, p_booking_time timestamptz default null,
+  p_phone_proof text default null)
 returns json language plpgsql security definer set search_path to 'public', 'extensions', 'pg_temp' as $$
 declare
   v_uid uuid := auth.uid();
@@ -581,7 +583,12 @@ declare
 begin
   if p_buyer_id is not null and p_buyer_id is distinct from v_uid then raise exception 'Invalid buyer'; end if;
   if v_uid is null then
-    if v_phone is null or not exists (select 1 from public.verified_phones where phone = v_phone and verified_at > now() - interval '30 minutes') then
+    if v_phone is null or p_phone_proof is null or length(p_phone_proof) < 20 or not exists (
+      select 1 from public.verified_phones
+      where phone = v_phone
+        and verified_at > now() - interval '30 minutes'
+        and proof_hash = encode(extensions.digest(p_phone_proof, 'sha256'), 'hex')
+    ) then
       raise exception 'Please verify your phone number first.';
     end if;
   end if;

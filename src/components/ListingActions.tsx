@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { shareOrWhatsApp } from "@/lib/native";
 import { notifyOther } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 
@@ -46,7 +47,6 @@ export default function ListingActions({ slug, title, status }: { slug: string; 
     const { error } = await supabase.rpc("report_listing", { p_slug: slug, p_reason: reason });
     setNote(error ? error.message : "Thank you. We will review it.");
   }
-  const wa = `https://wa.me/?text=${encodeURIComponent(`${title} on AmaNaija: ${url}`)}`;
   const btn = { padding: "12px 14px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 15 } as const;
   if (mine) {
     const b = { padding: "12px 14px", borderRadius: 10, border: "none", fontWeight: 700, fontSize: 15, background: "#f1f1f1", color: "#17131F" } as const;
@@ -55,7 +55,7 @@ export default function ListingActions({ slug, title, status }: { slug: string; 
         <div style={{ fontWeight: 800 }}>This is your listing</div>
         <div style={{ fontSize: 13, color: "#555", margin: "4px 0 10px" }}>Buyers who are interested will message you in Messages on the map. Status: {mine.status}.</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <a href={`https://wa.me/?text=${encodeURIComponent(`${title} on AmaNaija: ${url}`)}`} target="_blank" rel="noopener noreferrer" style={{ ...b, background: "#25d366", color: "#fff", textDecoration: "none" }}>Share</a>
+          <button type="button" onClick={() => shareOrWhatsApp({ title, text: `${title} on AmaNaija`, url })} style={{ ...b, background: "#25d366", color: "#fff" }}>Share</button>
           {mine.status === "active" && <button style={b} onClick={() => setStatus("reserved")}>Reserve</button>}
           {mine.status === "reserved" && <button style={b} onClick={() => setStatus("active")}>Make available</button>}
           {(mine.status === "active" || mine.status === "reserved") && <button style={b} onClick={() => setStatus("sold")}>Mark sold</button>}
@@ -72,7 +72,7 @@ export default function ListingActions({ slug, title, status }: { slug: string; 
       <div style={{ fontSize: 12, color: "#777" }}>Please do not type phone or account numbers. Chat stays inside AmaNaija.</div>
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
         <button disabled={busy} onClick={ask} style={{ ...btn, background: "#0a7a3d", color: "#fff", flex: 1 }}>Ask the seller</button>
-        <a href={wa} target="_blank" rel="noopener noreferrer" style={{ ...btn, background: "#25d366", color: "#fff", textDecoration: "none" }}>Share</a>
+        <button type="button" onClick={() => shareOrWhatsApp({ title, text: `${title} on AmaNaija`, url })} style={{ ...btn, background: "#25d366", color: "#fff" }}>Share</button>
         <button onClick={report} style={{ ...btn, background: "#f1f1f1", color: "#a00" }}>Report</button>
       </div>
       {note && <div role="status" style={{ marginTop: 8, fontSize: 14 }}>{note}</div>}
